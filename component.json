@@ -1,0 +1,30 @@
+{
+  "name": "gtask",
+  "version": "0.0.0",
+  "description": "Simple task manager",
+  "homepage": "https://github.com/goliatone/gtask",
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/goliatone/gtask.git"
+	},
+	 "bugs": {
+		"url": "https://github.com/goliatone/gtask/issues"
+	},
+	"author": {
+		"name": "goliatone",
+		"email": "hello@goliatone.com",
+		"url": "http://goliatone.com"
+	},
+	"licenses": [
+		{
+			"type": "MIT",
+			"url": "https://github.com/goliatone/gtask/blob/master/LICENSE-MIT"
+		}
+	],
+  "dependencies": {
+    "jquery": "~1.9.1",
+    "requirejs": "~2.1.4"
+  },
+  "devDependencies": {
+  }
+}
