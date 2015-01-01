@@ -67,14 +67,38 @@
         return con;
     };
 
+    var _passThrough = function(){
+        return true;
+    };
 
+    var _noop = function(){};
 
 ///////////////////////////////////////////////////
 // CONSTRUCTOR
 ///////////////////////////////////////////////////
 
 	var OPTIONS = {
-        autoinitialize:true
+        autoinitialize: true,
+        isActionSyncronous: function(){
+            console.log('IS ASYNCRONOUS', this.action.length)
+            return this.action.length === 0;
+        },
+
+        count: 0,
+        autoexecute: false,
+
+        when: _passThrough,
+        until: _passThrough,
+
+        action: _noop,
+        fail: _noop,
+        pass: _noop,
+
+        interval: -1000,
+        limit: -1,
+
+        context: {},
+        args:[]
     };
 
     /**
@@ -109,7 +133,74 @@
         console.log('Gtask: Init!');
         _extend(this, config);
 
-        return 'This is just a stub!';
+        if(this.autoexecute) this.execute();
+    };
+
+    Gtask.prototype.execute = function(){
+        if(this.preExecute()) this.executeUntil();
+    };
+
+    Gtask.prototype.preExecute = function(){
+        return this.conditionalExecution('when', this.execute.bind(this));
+    };
+
+    Gtask.prototype.conditionalExecution = function(action, iteration){
+        if(!this.shouldRetry(action)) return true;
+
+        this.incrementCount();
+
+        if(this.shouldFail()) this.doFail();
+        else this.interval(iteration, this.postIncrementInterval());
+
+        return false;
+    };
+
+    Gtask.prototype.executeUntil = function() {
+        if(this.isActionSyncronous()){
+            this.performAction();
+            return this.postExecute();
+        }
+        this.performAction(this.postExecute.bind(this));
+    };
+
+    Gtask.prototype.postExecute = function(){
+        if(! this.conditionalExecution('until', this.executeUntil)) return
+        this.doPass();
+    };
+
+    Gtask.prototype.shouldRetry = function(action){
+        console.log(action)
+        return this[action].apply(this.context, this.args);
+    };
+
+    Gtask.prototype.incrementCount = function(action){
+        this.count += 1;
+    };
+
+    Gtask.prototype.shouldFail = function() {
+        return this.limit >= 0 && this.count >= this.limit;
+    };
+
+    Gtask.prototype.doFail = function() {
+        this.fail.apply(this.context, this.args);
+    };
+
+    Gtask.prototype.doPass = function(){
+        this.pass.apply(this.context, this.args);
+    };
+
+    Gtask.prototype.postIncrementInterval = function(){
+        var currentInterval = this.interval;
+        if(this.interval < 0) this.interval *= 2;
+        return currentInterval;
+    };
+
+    Gtask.prototype.interval = function(cb, interval) {
+        setTimeout(cb, Math.abs(interval));
+    };
+
+    Gtask.prototype.performAction = function(done) {
+        this.action.apply(this.context, done ? this.args.concat(done) : this.args);
     };
 
     /**
