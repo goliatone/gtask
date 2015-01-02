@@ -17,7 +17,8 @@ define(function (require) {
         // console.log(type)
     };
 
-	var gtask = Gtask({
+
+    Queue().enqueue(Gtask({
         id:'get-user:',
         label: 'Getting user data...',
         task: function (done) {
@@ -27,54 +28,92 @@ define(function (require) {
                 done();
             }.bind(this), 2000);
         }
-    });
-
-    Queue.enqueue(gtask);
-
-    Queue.enqueue(Gtask({
+    }))
+    .enqueue(Gtask({
         id:'get-device:',
         label:'Getting device ID',
         task: function () {
             console.log(this.label);
         }
-    }));
-
-    Queue.enqueue(Gtask({
+    }))
+    .enqueue(Gtask({
         id:'connect-server:',
         label:'Getting connect to server...',
         task: function () {
             console.log(this.label);
         }
-    }));
-
-
+    }))
+    .enqueue(Queue().enqueue(Gtask({
+        id:'get-config',
+        label:'Subtask: Retrieve config from server...',
+        task: function (done) {
+            console.log('\t execute', this.id)
+            setTimeout(function(){
+                console.log('\t',this.label);
+                done();
+            }.bind(this), 1000);
+        }
+    })))
+    .execute()
+    .onSuccess = function(){
+        console.log('DONE')
+        return this
+    };
 });
 
 
-function Queue(){}
+function Queue(){
+    if(this.constructor !== Queue) return new Queue();
+    this.items = {};
+    this.tasks = [];
+    this.autoexecute = false;
+}
 
-Queue.items = [];
-Queue.enqueue = function(task) {
-    var id = Queue.items.push(task);
-    setTimeout(function() {
-        Queue.execute(id);
-    }, 0);
+
+
+Queue.prototype.enqueue = function(task) {
+    this.items[task.id] = task;
+    task.owner = this;
+    var index = this.tasks.push(task);
+    this.autoexecute && this.start(index);
+
+    return this;
 };
 
-Queue.execute = function execute(id) {
-    if (Queue.items.length < 1 || this.id) return
+Queue.prototype.execute = function(index){
+    index || (index = 0);
+    setTimeout(this.process.bind(this, index), 0);
+    return this;
+};
 
-    var task = Queue.items.shift();
+Queue.prototype.process = function process(index) {
+    if (this.tasks.length < 1 || this.index) return
+
+    var task = this.tasks.shift();
 
     if (!task) return console.log('process no process');
 
-    this.id = id;
+    this.index = index;
 
     task.onSuccess = function() {
-        this.id = null;
-        if(Queue.items.length) this.execute();
-        else console.log('DONE')
+        this.index = null;
+        if(this.tasks.length) this.process();
+        else this.emit('success')
     }.bind(this);
 
     task.execute();
+};
+
+Queue.prototype.emit = function(e){
+    var handler = 'on' + e.charAt(0).toUpperCase() + e.slice(1);
+    if(typeof this[handler] !== 'function') return;
+    var args = Array.prototype.slice(arguments, 1);
+
+    //we might not need this, hard to chain event handlers :/
+    var wrapper = function(){
+        this[handler].apply(this, args);
+        return this;
+    };
+    wrapper = wrapper.bind(this);
+    setTimeout(wrapper, 0);
 };
