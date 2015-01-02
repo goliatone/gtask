@@ -79,9 +79,11 @@
 
 	var OPTIONS = {
         autoinitialize: true,
-        isActionSyncronous: function(){
-            console.log('IS ASYNCRONOUS', this.action.length)
-            return this.action.length === 0;
+        isAsynTask: function(){
+            return this.task.length > 0;
+        },
+        incrementInterval: function(){
+            return this.interval * 2;
         },
 
         count: 0,
@@ -90,11 +92,13 @@
         when: _passThrough,
         until: _passThrough,
 
-        action: _noop,
-        fail: _noop,
-        pass: _noop,
+        task: _noop,
+        onFailure: _noop,
+        onSuccess: _noop,
+        onExecute: _noop,
 
         interval: -1000,
+        timeout: 3000,
         limit: -1,
 
         context: {},
@@ -130,51 +134,76 @@
         if(this.initialized) return this.logger.warn('Already initialized');
         this.initialized = true;
 
-        console.log('Gtask: Init!');
         _extend(this, config);
 
+        this.promise = new Promise(this.executor.bind(this));
+
         if(this.autoexecute) this.execute();
+
+        return this.execute.bind(this);
     };
 
     Gtask.prototype.execute = function(){
-        if(this.preExecute()) this.executeUntil();
+        if(this.isRunning) return this.promise;
+
+        this.startTime = Date.now();
+
+        if(this.isRunning = this.preExecute()) this.executeUntil();
+
+        return this.promise;
+    };
+
+    Gtask.prototype.performTask = function(done) {
+        done && (done = done.bind(this));
+
+        //TODO: make guard for async taking too long!!
+        var guard = function(){
+            var timeout = setTimeout(function(){
+
+            }, this.timeout);
+            timeout.
+            done();
+
+        }.bind(this);
+
+        this.doExecute();
+
+        return this.result = this.task.apply(this.context, done ? this.args.concat(done) : this.args);
+    };
+
+    Gtask.prototype.abort = function(){
+
+    };
+
+    Gtask.prototype.executeUntil = function() {
+        if(this.isAsynTask()) return this.performTask(this.postExecute);
+
+        this.performTask();
+        this.postExecute();
     };
 
     Gtask.prototype.preExecute = function(){
-        return this.conditionalExecution('when', this.execute.bind(this));
+        return this.conditionallyExecute('when', this.execute);
     };
 
-    Gtask.prototype.conditionalExecution = function(action, iteration){
-        if(!this.shouldRetry(action)) return true;
+    Gtask.prototype.postExecute = function(){
+        if(! this.conditionallyExecute('until', this.executeUntil)) return;
+        this.setInterval(this.doPass, 0);
+    };
 
-        this.incrementCount();
+    Gtask.prototype.conditionallyExecute = function(action, iterator){
+        if( !this.shouldRetryIf(action)) return true;
 
-        if(this.shouldFail()) this.doFail();
-        else this.interval(iteration, this.postIncrementInterval());
+        this.count += 1;
+
+        if(this.shouldFail()) this.setInterval(this.doFail, 0);
+        else this.intervalId = this.setInterval(iterator, this.postIncrementInterval());
 
         return false;
     };
 
-    Gtask.prototype.executeUntil = function() {
-        if(this.isActionSyncronous()){
-            this.performAction();
-            return this.postExecute();
-        }
-        this.performAction(this.postExecute.bind(this));
-    };
-
-    Gtask.prototype.postExecute = function(){
-        if(! this.conditionalExecution('until', this.executeUntil)) return
-        this.doPass();
-    };
-
-    Gtask.prototype.shouldRetry = function(action){
-        console.log(action)
+    Gtask.prototype.shouldRetryIf = function(action){
         return this[action].apply(this.context, this.args);
-    };
-
-    Gtask.prototype.incrementCount = function(action){
-        this.count += 1;
     };
 
     Gtask.prototype.shouldFail = function() {
@@ -182,26 +211,61 @@
     };
 
     Gtask.prototype.doFail = function() {
-        this.fail.apply(this.context, this.args);
+        this.endTime = Date.now();
+        this.emit('failure');
+        this._reject(this.result);
+        this.onFailure.apply(this.context, this.args);
     };
 
     Gtask.prototype.doPass = function(){
-        this.pass.apply(this.context, this.args);
+        this.endTime = Date.now();
+        this.emit('success');
+        this._resolve(this.result);
+        this.onSuccess.apply(this.context, this.args);
     };
+
+    Gtask.prototype.doExecute = function(){
+        this.emit('execute');
+        this.onExecute.apply(this.context, this.args);
+    }
 
     Gtask.prototype.postIncrementInterval = function(){
         var currentInterval = this.interval;
-        if(this.interval < 0) this.interval *= 2;
+        if(this.interval < 0) this.interval = this.incrementInterval();
         return currentInterval;
     };
 
-    Gtask.prototype.interval = function(cb, interval) {
-        setTimeout(cb, Math.abs(interval));
+    Gtask.prototype.setInterval = function(cb, interval) {
+        return setTimeout(cb.bind(this), Math.abs(interval));
     };
 
-    Gtask.prototype.performAction = function(done) {
-        this.action.apply(this.context, done ? this.args.concat(done) : this.args);
+    Gtask.prototype.then = function(resolve, reject, unbinded){
+        return this.promise.then(unbinded ? resolve :resolve.bind(this),
+                    unbinded ? reject :reject.bind(this)
+                );
     };
+
+    Gtask.prototype.executor = function(resolve, reject){
+        this._reject = reject;
+        this._resolve = resolve;
+    };
+
+    Gtask.prototype.executedTime = function(){
+        return this.endTime - this.startTime;
+    };
+
+    Gtask.prototype.executedCycles = function(){
+        return this.count + 1;
+    };
+
+    Gtask.prototype.reset = function(){
+        this.count =
+        this.endTime =
+        this.startTime = 0;
+        this.result = undefined;
+        this.isRunning = false;
+    };
+
 
     /**
      * Logger method, meant to be implemented by
