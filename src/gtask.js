@@ -95,7 +95,8 @@
         onFailure: _noop,
         onSuccess: _noop,
         onExecute: _noop,
-        onTimeout: _noop,
+        // onTimeout: _noop,
+        onAbort: _noop,
 
         interval: -1000,
         limit: -1,
@@ -153,6 +154,11 @@
         return this;
     };
 
+    Gtask.prototype.abort = function(){
+        this.doAbort();
+        clearTimeout(this.pid);
+    };
+
     Gtask.prototype._execute = function(done){
         if(this.isRunning = this.preExecute()) this.executeUntil();
     };
@@ -171,7 +177,9 @@
     };
 
     Gtask.prototype.preExecute = function(){
-        return this.conditionallyExecute('when', this._execute);
+        var isRunning = this.conditionallyExecute('when', this._execute);
+        if(!isRunning) this.emit('retry');
+        return isRunning;
     };
 
     Gtask.prototype.postExecute = function(){
@@ -216,6 +224,12 @@
         this.startTime = Date.now();
         this.emit('execute');
         this.onExecute.apply(this, this.args);
+    };
+
+    Gtask.prototype.doAbort = function(){
+        this.startTime = Date.now();
+        this.emit('abort');
+        this.onAbort.apply(this, this.args);
     };
 
     Gtask.prototype.postIncrementInterval = function(){
