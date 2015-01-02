@@ -80,7 +80,7 @@
 	var OPTIONS = {
         autoinitialize: true,
         isAsynTask: function(){
-            return this.task.length > 0;
+            return this.task.length >= 1;
         },
         incrementInterval: function(){
             return this.interval * 2;
@@ -110,7 +110,9 @@
      *
      * @param  {object} config Configuration object.
      */
-    var Gtask = function(config){
+    function Gtask(config){
+        if(this.constructor !== Gtask) return new Gtask(config);
+
         config = _extend({}, this.constructor.DEFAULTS, config);
 
         if(config.autoinitialize) this.init(config);
@@ -136,7 +138,7 @@
 
         _extend(this, config);
 
-        this.promise = new Promise(this.executor.bind(this));
+        // this.promise = new Promise(this.executor.bind(this));
 
         if(this.autoexecute) this.execute();
 
@@ -144,23 +146,22 @@
     };
 
     Gtask.prototype.execute = function(){
-        if(this.isRunning) return this.promise;
+        if(this.isRunning) return //this.promise;
 
         this.doExecute();
-
-        if(this.isRunning = this.preExecute()) this.executeUntil();
+        this._execute();
 
         return this.promise;
+    };
+
+    Gtask.prototype._execute = function(done){
+        if(this.isRunning = this.preExecute()) this.executeUntil();
     };
 
     Gtask.prototype.performTask = function(done) {
         done && (done = done.bind(this));
         //TODO: Make guard, to make sure that done is called!!
-        return this.result = this.task.apply(this.context, done ? this.args.concat(done) : this.args);
-    };
-
-    Gtask.prototype.abort = function(){
-
+        return this.result = this.task.apply(this, done ? this.args.concat(done) : this.args);
     };
 
     Gtask.prototype.executeUntil = function() {
@@ -171,11 +172,11 @@
     };
 
     Gtask.prototype.preExecute = function(){
-        return this.conditionallyExecute('when', this.execute);
+        return this.conditionallyExecute('when', this._execute);
     };
 
     Gtask.prototype.postExecute = function(){
-        if(! this.conditionallyExecute('until', this.executeUntil)) return;
+        if(!this.conditionallyExecute('until', this.executeUntil)) return;
         this.setInterval(this.doPass, 0);
     };
 
@@ -191,7 +192,7 @@
     };
 
     Gtask.prototype.shouldRetryIf = function(action){
-        return this[action].apply(this.context, this.args);
+        return !this[action].apply(this, this.args);
     };
 
     Gtask.prototype.shouldFail = function() {
@@ -201,21 +202,21 @@
     Gtask.prototype.doFail = function() {
         this.endTime = Date.now();
         this.emit('failure');
-        this._reject(this.result);
-        this.onFailure.apply(this.context, this.args);
+        // this._reject(this.result);
+        this.onFailure.apply(this, this.args);
     };
 
     Gtask.prototype.doPass = function(){
         this.endTime = Date.now();
         this.emit('success');
-        this._resolve(this.result);
-        this.onSuccess.apply(this.context, this.args);
+        // this._resolve(this.result);
+        this.onSuccess.apply(this, this.args);
     };
 
-    Gtask.prototype.doExecute = function(done){
+    Gtask.prototype.doExecute = function(){
         this.startTime = Date.now();
         this.emit('execute');
-        this.onExecute.apply(this.context, this.args);
+        this.onExecute.apply(this, this.args);
     };
 
     Gtask.prototype.postIncrementInterval = function(){
@@ -228,16 +229,16 @@
         return setTimeout(cb.bind(this), Math.abs(interval));
     };
 
-    Gtask.prototype.then = function(resolve, reject, unbinded){
-        return this.promise.then(unbinded ? resolve :resolve.bind(this),
-                    unbinded ? reject :reject.bind(this)
-                );
-    };
+    // Gtask.prototype.then = function(resolve, reject, unbinded){
+    //     return this.promise.then(unbinded ? resolve :resolve.bind(this),
+    //                 unbinded ? reject :reject.bind(this)
+    //             );
+    // };
 
-    Gtask.prototype.executor = function(resolve, reject){
-        this._reject = reject;
-        this._resolve = resolve;
-    };
+    // Gtask.prototype.executor = function(resolve, reject){
+    //     this._reject = reject;
+    //     this._resolve = resolve;
+    // };
 
     Gtask.prototype.executedTime = function(){
         return this.endTime - this.startTime;
