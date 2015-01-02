@@ -14,7 +14,7 @@ define(function (require) {
         $ = require('jquery');
 
     Gtask.prototype.emit = function(type){
-        // console.log(type)
+        console.debug(type)
     };
 
 
@@ -39,6 +39,11 @@ define(function (require) {
     .enqueue(Gtask({
         id:'connect-server:',
         label:'Getting connect to server...',
+        when:function(){
+            var doIt = Math.random() > .6;
+            console.log('DO IT', doIt)
+            return doIt;
+        },
         task: function () {
             console.log(this.label);
         }
@@ -95,10 +100,17 @@ Queue.prototype.process = function process(index) {
 
     this.index = index;
 
+    task.onAbort = function(){
+        task.onAbort = null;
+        this.index = 'aborted';
+        this.emit('abort');
+    };
+
     task.onSuccess = function() {
+        task.onSuccess =
         this.index = null;
         if(this.tasks.length) this.process();
-        else this.emit('success')
+        else this.emit('success');
     }.bind(this);
 
     task.execute();
@@ -108,12 +120,7 @@ Queue.prototype.emit = function(e){
     var handler = 'on' + e.charAt(0).toUpperCase() + e.slice(1);
     if(typeof this[handler] !== 'function') return;
     var args = Array.prototype.slice(arguments, 1);
-
-    //we might not need this, hard to chain event handlers :/
-    var wrapper = function(){
+    setTimeout(function(){
         this[handler].apply(this, args);
-        return this;
-    };
-    wrapper = wrapper.bind(this);
-    setTimeout(wrapper, 0);
+    }.bind(this), 0);
 };
