@@ -67,11 +67,10 @@
         return con;
     };
 
-    var _passThrough = function(){
-        return true;
-    };
 
     var _noop = function(){};
+
+    var _passThrough = function(){ return true; };
 
 ///////////////////////////////////////////////////
 // CONSTRUCTOR
@@ -118,9 +117,9 @@
         if(config.autoinitialize) this.init(config);
     };
 
-    Gtask.className = Gtask.prototype.className = 'Gtask';
-
     Gtask.VERSION = '0.0.0';
+
+    Gtask.className = Gtask.prototype.className = 'Gtask';
 
     /**
      * Make default options available so we
@@ -151,7 +150,7 @@
         this.doExecute();
         this._execute();
 
-        return this.promise;
+        return this;
     };
 
     Gtask.prototype._execute = function(done){
