@@ -96,9 +96,9 @@
         onFailure: _noop,
         onSuccess: _noop,
         onExecute: _noop,
+        onTimeout: _noop,
 
         interval: -1000,
-        timeout: 3000,
         limit: -1,
 
         context: {},
@@ -116,7 +116,7 @@
         if(config.autoinitialize) this.init(config);
     };
 
-    Gtask.name = Gtask.prototype.name = 'Gtask';
+    Gtask.className = Gtask.prototype.className = 'Gtask';
 
     Gtask.VERSION = '0.0.0';
 
@@ -146,7 +146,7 @@
     Gtask.prototype.execute = function(){
         if(this.isRunning) return this.promise;
 
-        this.startTime = Date.now();
+        this.doExecute();
 
         if(this.isRunning = this.preExecute()) this.executeUntil();
 
@@ -155,19 +155,7 @@
 
     Gtask.prototype.performTask = function(done) {
         done && (done = done.bind(this));
-
-        //TODO: make guard for async taking too long!!
-        var guard = function(){
-            var timeout = setTimeout(function(){
-
-            }, this.timeout);
-            timeout.
-            done();
-
-        }.bind(this);
-
-        this.doExecute();
-
+        //TODO: Make guard, to make sure that done is called!!
         return this.result = this.task.apply(this.context, done ? this.args.concat(done) : this.args);
     };
 
@@ -197,7 +185,7 @@
         this.count += 1;
 
         if(this.shouldFail()) this.setInterval(this.doFail, 0);
-        else this.intervalId = this.setInterval(iterator, this.postIncrementInterval());
+        else this.pid = this.setInterval(iterator, this.postIncrementInterval());
 
         return false;
     };
@@ -224,10 +212,11 @@
         this.onSuccess.apply(this.context, this.args);
     };
 
-    Gtask.prototype.doExecute = function(){
+    Gtask.prototype.doExecute = function(done){
+        this.startTime = Date.now();
         this.emit('execute');
         this.onExecute.apply(this.context, this.args);
-    }
+    };
 
     Gtask.prototype.postIncrementInterval = function(){
         var currentInterval = this.interval;
